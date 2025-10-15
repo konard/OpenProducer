@@ -1,18 +1,18 @@
-# GitHub Issue Bot (OpenProducer Meta-Bot)
+# OpenProducer - GitHub Issue Orchestrator Bot
 
-> Laravel-based GitHub bot that acts as an orchestrator, breaking down large specifications into manageable issues using AI
+> Laravel-based GitHub bot that intelligently breaks down large specifications into manageable issues using AI
 
 ## 📋 Overview
 
-This is an autonomous GitHub bot built with Laravel 10+ that serves as a **meta-bot** or **orchestrator** for other AI agents. Simply mention `@xierongchuan` in an issue with your requirements, and the bot will intelligently break down large specifications into smaller, actionable issues for other agents to solve.
+OpenProducer is an autonomous GitHub bot built with Laravel 11+ that serves as a **meta-bot** or **orchestrator** for development teams. Simply mention `@TheOpenProducerBot` in an issue with your requirements, and the bot will intelligently break down large specifications into smaller, actionable issues.
 
-The bot uses OpenAI-compatible APIs (including ZAI GLM 4.6) to analyze requirements and automatically determine the optimal task breakdown.
+The bot supports multiple AI providers (OpenAI, Gemini, ZAI GLM 4.6, and any OpenAI-compatible API) to analyze requirements and automatically determine the optimal task breakdown.
 
 **Key Features:**
 - 🎯 **Intelligent task orchestration**: Automatically breaks down large specs into manageable issues
 - 🧠 **AI-powered analysis**: Determines optimal number of sub-tasks based on complexity
-- 🚀 **Simple mention-based triggering**: Just use `@xierongchuan` - no complex commands needed
-- 🔌 OpenAI-compatible API integration (ZAI GLM 4.6 by default)
+- 🚀 **Simple mention-based triggering**: Just use `@TheOpenProducerBot` - no complex commands needed
+- 🔌 Multiple AI providers: OpenAI, Gemini, ZAI GLM 4.6, and any OpenAI-compatible API
 - 🔒 Security-first: NO file modifications in target repositories
 - ✅ Dry-run mode with confirmation workflow
 - 🔄 Rollback support for created issues
@@ -31,9 +31,9 @@ The bot operates exclusively through GitHub Issues API - it **never modifies, co
 
 ## 📦 Requirements
 
-- PHP 8.1 or higher
+- PHP 8.2 or higher
 - Composer
-- Laravel 10+
+- Laravel 11+
 - SQLite or MySQL database
 - GitHub Personal Access Token or GitHub App credentials
 - (Optional) OpenAI-compatible API key for AI generation
@@ -72,11 +72,18 @@ GITHUB_TOKEN=your_github_personal_access_token
 # GITHUB_PRIVATE_KEY_PATH=/path/to/private-key.pem
 # GITHUB_WEBHOOK_SECRET=your_webhook_secret
 
-# OpenAI-Compatible API (ZAI GLM 4.6 by default)
-OPENAI_API_BASE_URL=https://your-openai-compatible-api.com/v1
-OPENAI_API_KEY=your_api_key
-OPENAI_PROVIDER=ZAI
-OPENAI_MODEL=zai-glm-4.6
+# AI Provider Configuration
+# Choose one: OPENAI, GEMINI, ZAI, CUSTOM
+OPENAI_PROVIDER=GEMINI
+OPENAI_MODEL=gemini-2.5-flash
+
+# OpenAI Configuration
+OPENAI_API_BASE_URL=https://api.openai.com/v1
+OPENAI_API_KEY=your_openai_api_key
+
+# Gemini Configuration
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_MODEL=gemini-2.5-flash
 
 # Bot Configuration
 BOT_RUN_RATE_LIMIT_PER_MINUTE=30
@@ -168,9 +175,11 @@ php artisan bot:process --issue=123 --repo=owner/repo
 
 ## 📖 Usage
 
-### Creating Issues with @xierongchuan Mention (Recommended)
+For comprehensive examples and detailed guides, see the [examples/](./examples/) directory.
 
-Simply mention `@xierongchuan` in an issue with your requirements, and the bot will automatically:
+### Creating Issues with @TheOpenProducerBot Mention (Recommended)
+
+Simply mention `@TheOpenProducerBot` in an issue with your requirements, and the bot will automatically:
 1. Analyze your requirements
 2. Determine the optimal number of sub-issues needed
 3. Break down the specification into actionable tasks
@@ -178,7 +187,7 @@ Simply mention `@xierongchuan` in an issue with your requirements, and the bot w
 
 **Simple Example:**
 ```
-@xierongchuan
+@TheOpenProducerBot
 
 Build a user authentication system with login, signup, password reset, and email verification.
 The system should use JWT tokens and integrate with our existing API.
@@ -186,7 +195,7 @@ The system should use JWT tokens and integrate with our existing API.
 
 **With Optional Configuration:**
 ```
-@xierongchuan
+@TheOpenProducerBot
 
 template: Implement user authentication feature
 Requirements:
@@ -230,7 +239,7 @@ labels: bug, high-priority
 
 1. Create issue with `dry_run: true`
 2. Bot posts preview comment with configuration
-3. Reply with `@bot confirm` to proceed
+3. Reply with `@TheOpenProducerBot confirm` to proceed
 4. Bot creates issues and posts summary
 
 ### Bot Commands
@@ -239,10 +248,10 @@ Reply to the bot's comment with these commands:
 
 | Command | Description |
 |---------|-------------|
-| `@bot confirm` | Confirm and proceed with issue creation |
-| `@bot cancel` | Cancel pending run |
-| `@bot rollback last` | Rollback last run (closes all created issues) |
-| `@bot status` | Show status of recent runs |
+| `@TheOpenProducerBot confirm` | Confirm and proceed with issue creation |
+| `@TheOpenProducerBot cancel` | Cancel pending run |
+| `@TheOpenProducerBot rollback last` | Rollback last run (closes all created issues) |
+| `@TheOpenProducerBot status` | Show status of recent runs |
 
 ### Artisan Commands
 
@@ -272,57 +281,56 @@ php artisan test
 ./vendor/bin/phpunit tests/Unit/DeduplicationServiceTest.php
 ```
 
-## 🔌 OpenAI-Compatible API Integration
+## 🔌 AI Provider Integration
 
-### ZAI GLM 4.6 (Default)
+OpenProducer supports multiple AI providers through a unified interface. The bot will automatically determine the optimal number of issues based on your requirements using the configured AI service.
 
-The bot comes pre-configured for ZAI GLM 4.6:
+### Gemini (Recommended)
+
+Google's Gemini API offers excellent performance for task breakdown:
+
+```bash
+OPENAI_PROVIDER=GEMINI
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_MODEL=gemini-2.5-flash
+```
+
+### OpenAI
+
+OpenAI's GPT models provide high-quality task analysis:
+
+```bash
+OPENAI_PROVIDER=OPENAI
+OPENAI_API_KEY=sk-your-openai-key
+OPENAI_MODEL=gpt-4
+OPENAI_API_BASE_URL=https://api.openai.com/v1
+```
+
+### ZAI GLM 4.6
+
+ZAI's GLM 4.6 model is optimized for development tasks:
 
 ```bash
 OPENAI_PROVIDER=ZAI
+OPENAI_API_KEY=your_zai_api_key
 OPENAI_MODEL=zai-glm-4.6
 OPENAI_API_BASE_URL=https://your-zai-endpoint.com/v1
-OPENAI_API_KEY=your_zai_api_key
 ```
 
-**Example API Request:**
-```json
-{
-  "model": "zai-glm-4.6",
-  "messages": [
-    {
-      "role": "user",
-      "content": "Generate issue descriptions..."
-    }
-  ],
-  "temperature": 0.7,
-  "max_tokens": 2000
-}
-```
+### Custom OpenAI-Compatible Provider
 
-### Using Other Providers
+Any OpenAI-compatible API can be used:
 
-The bot supports any OpenAI-compatible API:
-
-**OpenAI:**
-```bash
-OPENAI_PROVIDER=OPENAI
-OPENAI_MODEL=gpt-4
-OPENAI_API_BASE_URL=https://api.openai.com/v1
-OPENAI_API_KEY=sk-...
-```
-
-**Custom Provider:**
 ```bash
 OPENAI_PROVIDER=CUSTOM
+OPENAI_API_KEY=your_api_key
 OPENAI_MODEL=your-model-name
 OPENAI_API_BASE_URL=https://your-api.com/v1
-OPENAI_API_KEY=your_key
 ```
 
 ### Fallback Mode
 
-If AI API is unavailable, the bot automatically falls back to simple template duplication with component rotation.
+If the AI API is unavailable, the bot automatically falls back to simple template duplication with component rotation.
 
 ## 🛡️ Security Features
 
@@ -395,7 +403,7 @@ curl https://your-domain.com/api/health
 ### Scenario 1: Break down large specification (AI-determined count)
 
 ```
-@xierongchuan
+@TheOpenProducerBot
 
 We need to implement a complete REST API for our e-commerce platform with the following features:
 - User authentication and authorization (JWT)
@@ -415,7 +423,7 @@ The bot will analyze this and automatically determine that this requires approxi
 ### Scenario 2: Simple task with explicit count
 
 ```
-@xierongchuan
+@TheOpenProducerBot
 
 template: Fix critical production bug in authentication module
 Impact: Users cannot log in
@@ -429,7 +437,7 @@ components_list: auth-service, session-manager, api-gateway
 ### Scenario 3: Documentation tasks (auto-determined)
 
 ```
-@xierongchuan
+@TheOpenProducerBot
 
 Update documentation for the new API endpoints we added in v2.0:
 - Authentication endpoints
