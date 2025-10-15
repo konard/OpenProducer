@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 return [
     /*
     |--------------------------------------------------------------------------
@@ -34,7 +36,7 @@ return [
         'base_url' => env('OPENAI_API_BASE_URL', 'https://api.openai.com/v1'),
         'api_key' => env('OPENAI_API_KEY'),
         'provider' => env('OPENAI_PROVIDER', 'ZAI'),
-        'model' => env('OPENAI_MODEL', 'zai-glm-4.6'),
+        'model' => env('OPENAI_MODEL', 'glm-4.6'),
         'temperature' => env('OPENAI_TEMPERATURE', 0.7),
         'max_tokens' => env('OPENAI_MAX_TOKENS', 2000),
         'timeout' => 60, // seconds
