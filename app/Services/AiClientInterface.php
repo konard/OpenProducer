@@ -5,6 +5,15 @@ namespace App\Services;
 interface AiClientInterface
 {
     /**
+     * Determine optimal number of issues based on requirements
+     *
+     * @param string $requirements The requirements/specification text
+     * @param array $options Additional options
+     * @return int Recommended number of issues to create
+     */
+    public function determineIssueCount(string $requirements, array $options = []): int;
+
+    /**
      * Generate issue bodies based on template and components
      *
      * @param string $template The template to use for generation

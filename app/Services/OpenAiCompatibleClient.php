@@ -29,6 +29,40 @@ class OpenAiCompatibleClient implements AiClientInterface
     }
 
     /**
+     * Determine optimal number of issues based on requirements
+     */
+    public function determineIssueCount(string $requirements, array $options = []): int
+    {
+        if (!$this->isAvailable()) {
+            Log::warning('AI service is not available, using default count');
+            return $this->estimateCountFromRequirements($requirements);
+        }
+
+        try {
+            $prompt = $this->buildCountDeterminationPrompt($requirements);
+            $cacheKey = 'ai_count_' . md5($prompt);
+
+            $result = Cache::remember($cacheKey, $this->cacheTtl, function () use ($prompt, $options) {
+                return $this->callAiApi($prompt, $options);
+            });
+
+            // Parse the result to extract count
+            $count = $this->parseCountFromResponse($result);
+
+            // Validate and cap the count
+            $maxIssues = config('bot.behavior.max_issues_per_run', 100);
+            $count = max(1, min($count, $maxIssues));
+
+            Log::info('AI determined issue count', ['count' => $count]);
+
+            return $count;
+        } catch (Exception $e) {
+            Log::error('AI count determination failed: ' . $e->getMessage());
+            return $this->estimateCountFromRequirements($requirements);
+        }
+    }
+
+    /**
      * Generate issue bodies based on template and components
      */
     public function generateIssueBodies(
@@ -245,5 +279,88 @@ PROMPT;
         }
 
         return $issues;
+    }
+
+    /**
+     * Build prompt for determining issue count
+     */
+    private function buildCountDeterminationPrompt(string $requirements): string
+    {
+        return <<<PROMPT
+You are a task breakdown assistant. Analyze the following requirements/specification and determine the optimal number of smaller issues/tasks needed to implement it.
+
+Requirements:
+{$requirements}
+
+Consider:
+- Complexity of the requirements
+- Natural logical breakdown into subtasks
+- Manageable task sizes (each issue should be a focused, actionable unit)
+- Typical development workflow (frontend, backend, tests, docs, etc.)
+- Don't create too many small tasks or too few large tasks
+
+Respond with ONLY a JSON object in this format:
+{
+  "count": <number>,
+  "reasoning": "<brief explanation>"
+}
+
+Example response:
+{
+  "count": 5,
+  "reasoning": "The requirements describe a user authentication system which naturally breaks into: 1) database schema, 2) backend API, 3) frontend UI, 4) tests, 5) documentation"
+}
+PROMPT;
+    }
+
+    /**
+     * Parse count from AI response
+     */
+    private function parseCountFromResponse(array $response): int
+    {
+        // Handle JSON response
+        if (isset($response['count']) && is_numeric($response['count'])) {
+            return (int)$response['count'];
+        }
+
+        // Handle raw content
+        if (isset($response['raw_content'])) {
+            $content = $response['raw_content'];
+
+            // Try to extract JSON
+            if (preg_match('/\{[^}]*"count"\s*:\s*(\d+)[^}]*\}/', $content, $matches)) {
+                return (int)$matches[1];
+            }
+
+            // Try to find any number in the response
+            if (preg_match('/\b(\d+)\b/', $content, $matches)) {
+                return (int)$matches[1];
+            }
+        }
+
+        // Default fallback
+        return 5;
+    }
+
+    /**
+     * Estimate count from requirements (simple heuristic fallback)
+     */
+    private function estimateCountFromRequirements(string $requirements): int
+    {
+        $length = strlen($requirements);
+        $lineCount = substr_count($requirements, "\n") + 1;
+
+        // Simple heuristic based on content size
+        if ($length < 200 || $lineCount < 3) {
+            return 1; // Very simple requirement
+        } elseif ($length < 500 || $lineCount < 10) {
+            return 3; // Small to medium
+        } elseif ($length < 1000 || $lineCount < 20) {
+            return 5; // Medium
+        } elseif ($length < 2000 || $lineCount < 40) {
+            return 8; // Medium to large
+        } else {
+            return 10; // Large specification
+        }
     }
 }
