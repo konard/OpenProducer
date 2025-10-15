@@ -14,11 +14,11 @@ class ConfigurationParser
     {
         // Check if body contains the trigger command
         if (!$this->hasTriggerCommand($issueBody)) {
-            throw new Exception('Issue body does not contain /spawn-issues command');
+            throw new Exception('Issue body does not contain bot mention trigger');
         }
 
         $config = [
-            'count' => 1,
+            'count' => null, // Will be determined by AI if not specified
             'template' => '',
             'labels' => [],
             'assignees' => [],
@@ -32,18 +32,20 @@ class ConfigurationParser
         $lines = explode("\n", $issueBody);
         $inTemplateBlock = false;
         $templateLines = [];
+        $foundExplicitConfig = false;
 
         foreach ($lines as $line) {
             $line = trim($line);
 
-            // Skip trigger command
-            if (Str::startsWith($line, '/spawn-issues')) {
+            // Skip trigger mentions
+            if (Str::startsWith($line, '@xierongchuan') || Str::startsWith($line, '/spawn-issues')) {
                 continue;
             }
 
             // Handle template block (can be multiline)
             if (Str::startsWith($line, 'template:')) {
                 $inTemplateBlock = true;
+                $foundExplicitConfig = true;
                 $templateValue = trim(Str::after($line, 'template:'));
                 if (!empty($templateValue)) {
                     $templateLines[] = $templateValue;
@@ -68,6 +70,7 @@ class ConfigurationParser
             if (Str::contains($line, ':')) {
                 [$key, $value] = array_map('trim', explode(':', $line, 2));
                 $key = strtolower($key);
+                $foundExplicitConfig = true;
 
                 switch ($key) {
                     case 'count':
@@ -108,6 +111,11 @@ class ConfigurationParser
             $config['template'] = implode("\n", $templateLines);
         }
 
+        // If no explicit config was found, treat entire issue body as template
+        if (!$foundExplicitConfig) {
+            $config['template'] = $this->extractTemplateFromBody($issueBody);
+        }
+
         return $this->validateConfiguration($config);
     }
 
@@ -116,8 +124,31 @@ class ConfigurationParser
      */
     public function hasTriggerCommand(string $issueBody): bool
     {
-        $trigger = config('bot.commands.trigger', '/spawn-issues');
-        return Str::contains($issueBody, $trigger);
+        // Support both new mention-based trigger and legacy command
+        $mentionTrigger = config('bot.commands.mention_trigger', '@xierongchuan');
+        $legacyTrigger = config('bot.commands.trigger', '/spawn-issues');
+
+        return Str::contains($issueBody, $mentionTrigger) || Str::contains($issueBody, $legacyTrigger);
+    }
+
+    /**
+     * Extract template from issue body when no explicit config
+     */
+    private function extractTemplateFromBody(string $issueBody): string
+    {
+        $lines = explode("\n", $issueBody);
+        $templateLines = [];
+
+        foreach ($lines as $line) {
+            $line = trim($line);
+            // Skip mention triggers
+            if (Str::startsWith($line, '@xierongchuan') || Str::startsWith($line, '/spawn-issues')) {
+                continue;
+            }
+            $templateLines[] = $line;
+        }
+
+        return trim(implode("\n", $templateLines));
     }
 
     /**
@@ -161,16 +192,17 @@ class ConfigurationParser
     {
         $maxIssues = config('bot.behavior.max_issues_per_run');
 
-        if ($config['count'] < 1) {
+        // Count is now optional - if null, will be determined by AI
+        if ($config['count'] !== null && $config['count'] < 1) {
             throw new Exception('Count must be at least 1');
         }
 
-        if ($config['count'] > $maxIssues && !$config['dry_run']) {
+        if ($config['count'] !== null && $config['count'] > $maxIssues && !$config['dry_run']) {
             throw new Exception("Count exceeds maximum allowed ({$maxIssues}). Use dry_run mode or reduce count.");
         }
 
         if (empty($config['template'])) {
-            throw new Exception('Template is required');
+            throw new Exception('Template is required - please provide a description or specification');
         }
 
         if ($config['rate_limit_per_minute'] < 1) {

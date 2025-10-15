@@ -84,6 +84,13 @@ class ProcessSpawnIssueJob implements ShouldQueue
             // Mark as started
             $botRun->markAsStarted();
 
+            // Determine count if not specified
+            if ($this->configuration['count'] === null) {
+                Log::info('Count not specified, using AI to determine optimal count');
+                $this->configuration['count'] = $aiClient->determineIssueCount($this->configuration['template']);
+                Log::info('AI determined count', ['count' => $this->configuration['count']]);
+            }
+
             // Generate issues using AI
             $issues = $this->generateIssues($aiClient);
 
@@ -167,13 +174,17 @@ class ProcessSpawnIssueJob implements ShouldQueue
             ? implode(', ', $this->configuration['labels'])
             : '';
 
+        $countText = $this->configuration['count'] !== null
+            ? $this->configuration['count']
+            : 'Auto-determined by AI (will be decided when confirmed)';
+
         $comment = <<<COMMENT
 🤖 **Dry Run / Confirmation Required**
 
 **Run ID**: `{$botRun->run_id}`
 
 **Configuration**:
-- Count: {$this->configuration['count']}
+- Count: {$countText}
 - Template:
 ```
 {$this->configuration['template']}
@@ -182,7 +193,7 @@ class ProcessSpawnIssueJob implements ShouldQueue
 - Unique by: `{$this->configuration['unique_by']}`
 {$warningsText}
 
-**Preview**: This will create {$this->configuration['count']} issues based on the template above.
+**Preview**: This will create issues based on the template above.
 
 To proceed, reply with: `@bot confirm`
 To cancel, reply with: `@bot cancel`

@@ -1,13 +1,17 @@
 # GitHub Issue Bot (OpenProducer Meta-Bot)
 
-> Laravel-based GitHub bot for creating multiple issues with OpenAI-compatible API support, including ZAI GLM 4.6
+> Laravel-based GitHub bot that acts as an orchestrator, breaking down large specifications into manageable issues using AI
 
 ## 📋 Overview
 
-This is an autonomous GitHub bot built with Laravel 10+ that creates series of issues based on templates and configurations. The bot supports OpenAI-compatible APIs for AI-powered content generation and provides features like dry-run mode, deduplication, rate limiting, and rollback capabilities.
+This is an autonomous GitHub bot built with Laravel 10+ that serves as a **meta-bot** or **orchestrator** for other AI agents. Simply mention `@xierongchuan` in an issue with your requirements, and the bot will intelligently break down large specifications into smaller, actionable issues for other agents to solve.
+
+The bot uses OpenAI-compatible APIs (including ZAI GLM 4.6) to analyze requirements and automatically determine the optimal task breakdown.
 
 **Key Features:**
-- 🤖 Automated issue generation from templates
+- 🎯 **Intelligent task orchestration**: Automatically breaks down large specs into manageable issues
+- 🧠 **AI-powered analysis**: Determines optimal number of sub-tasks based on complexity
+- 🚀 **Simple mention-based triggering**: Just use `@xierongchuan` - no complex commands needed
 - 🔌 OpenAI-compatible API integration (ZAI GLM 4.6 by default)
 - 🔒 Security-first: NO file modifications in target repositories
 - ✅ Dry-run mode with confirmation workflow
@@ -164,34 +168,63 @@ php artisan bot:process --issue=123 --repo=owner/repo
 
 ## 📖 Usage
 
-### Creating Issues with /spawn-issues Command
+### Creating Issues with @xierongchuan Mention (Recommended)
 
-Create an issue in your repository with the following format:
+Simply mention `@xierongchuan` in an issue with your requirements, and the bot will automatically:
+1. Analyze your requirements
+2. Determine the optimal number of sub-issues needed
+3. Break down the specification into actionable tasks
+4. Create the issues
 
+**Simple Example:**
 ```
-/spawn-issues
-count: 10
-template: Fix bug in authentication module
-This needs to be addressed urgently
-labels: bug, high-priority, auto-agent-task
-assignees: username1, username2
+@xierongchuan
+
+Build a user authentication system with login, signup, password reset, and email verification.
+The system should use JWT tokens and integrate with our existing API.
+```
+
+**With Optional Configuration:**
+```
+@xierongchuan
+
+template: Implement user authentication feature
+Requirements:
+- JWT token-based authentication
+- Login, signup, password reset flows
+- Email verification
+- Integration with existing API
+
+labels: feature, backend
 dry_run: true
-unique_by: title
-components_list: login, signup, password-reset
+components_list: auth-service, email-service, api-gateway
 ```
 
 **Configuration Options:**
 
 | Option | Type | Description | Default |
 |--------|------|-------------|---------|
-| `count` | integer | Number of issues to create | 1 |
-| `template` | string (multiline) | Template for issue body | Required |
+| `count` | integer | Number of issues to create | AI-determined based on complexity |
+| `template` | string (multiline) | Template/requirements for issues | Required (or entire issue body) |
 | `labels` | comma-separated | Labels to apply | [] |
 | `assignees` | comma-separated | Users to assign | [] |
 | `dry_run` | boolean | Preview without creating | false |
 | `unique_by` | title/body/hash | Deduplication strategy | hash |
 | `components_list` | comma-separated | Components to include | [] |
 | `rate_limit_per_minute` | integer | Rate limit for API calls | 30 |
+
+**Note:** The `count` parameter is now **optional**. If not specified, the AI will analyze your requirements and automatically determine the optimal number of issues to create.
+
+### Legacy /spawn-issues Command (Still Supported)
+
+The original `/spawn-issues` command format is still supported for backwards compatibility:
+
+```
+/spawn-issues
+count: 10
+template: Fix bug in authentication module
+labels: bug, high-priority
+```
 
 ### Dry Run and Confirmation Workflow
 
@@ -359,20 +392,59 @@ curl https://your-domain.com/api/health
 
 ## 📝 Example Scenarios
 
-### Scenario 1: Create 50 bug fix tasks
+### Scenario 1: Break down large specification (AI-determined count)
 
 ```
-/spawn-issues
-count: 50
-template: Fix critical bug in production
-Impact: High
+@xierongchuan
+
+We need to implement a complete REST API for our e-commerce platform with the following features:
+- User authentication and authorization (JWT)
+- Product catalog management (CRUD operations)
+- Shopping cart functionality
+- Order processing and payment integration
+- Admin dashboard for analytics
+- Email notifications for order status
+
+The API should follow RESTful principles, include comprehensive error handling, and have full test coverage.
+
+labels: api, backend, feature
+```
+
+The bot will analyze this and automatically determine that this requires approximately 8-10 issues covering different aspects.
+
+### Scenario 2: Simple task with explicit count
+
+```
+@xierongchuan
+
+template: Fix critical production bug in authentication module
+Impact: Users cannot log in
 Priority: P0
-labels: bug, critical, needs-triage
-dry_run: false
-unique_by: hash
+
+count: 3
+labels: bug, critical, p0
+components_list: auth-service, session-manager, api-gateway
 ```
 
-### Scenario 2: Generate component-specific tests
+### Scenario 3: Documentation tasks (auto-determined)
+
+```
+@xierongchuan
+
+Update documentation for the new API endpoints we added in v2.0:
+- Authentication endpoints
+- User management
+- Product catalog
+- Orders and payments
+- Webhooks
+
+Each section needs API reference, code examples, and integration guide.
+
+labels: documentation, v2.0
+unique_by: title
+```
+
+### Scenario 4: Using legacy command format
 
 ```
 /spawn-issues
@@ -381,18 +453,6 @@ template: Write unit tests for component
 Coverage target: 80%
 labels: testing, enhancement
 components_list: auth, api, database, ui, logging
-unique_by: title
-```
-
-### Scenario 3: Create documentation tasks
-
-```
-/spawn-issues
-count: 10
-template: Update documentation for new feature
-Include code examples and usage instructions
-labels: documentation, good-first-issue
-dry_run: true
 ```
 
 ## 🤝 Contributing
