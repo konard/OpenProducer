@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: github-issue-bot
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - ./:/var/www
+      - ./storage:/var/www/storage
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_ENV=production
+      - APP_DEBUG=false
+    depends_on:
+      - database
+    networks:
+      - bot-network
+    command: php artisan serve --host=0.0.0.0 --port=8000
+
+  queue:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: github-issue-bot-queue
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - ./:/var/www
+      - ./storage:/var/www/storage
+    depends_on:
+      - database
+    networks:
+      - bot-network
+    command: php artisan queue:work --tries=3 --timeout=600
+
+  database:
+    image: mysql:8.0
+    container_name: github-issue-bot-db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-github_bot}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-secret}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-secret}
+      MYSQL_USER: ${DB_USERNAME:-bot_user}
+    volumes:
+      - db-data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    networks:
+      - bot-network
+
+  # Optional: Redis for caching and queues
+  redis:
+    image: redis:7-alpine
+    container_name: github-issue-bot-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - bot-network
+    volumes:
+      - redis-data:/data
+
+networks:
+  bot-network:
+    driver: bridge
+
+volumes:
+  db-data:
+    driver: local
+  redis-data:
+    driver: local
