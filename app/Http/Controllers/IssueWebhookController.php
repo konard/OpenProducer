@@ -136,47 +136,94 @@ class IssueWebhookController extends Controller
         // Extract command from comment
         $command = $this->parser->extractCommand($commentBody);
 
-        if (!$command) {
-            return response()->json(['message' => 'No bot command found'], 200);
-        }
-
-        Log::info('Bot command received', [
-            'command' => $command,
-            'repository' => $repository,
-            'issue_number' => $issueNumber,
-        ]);
-
-        try {
-            switch ($command) {
-                case 'confirm':
-                    return $this->handleConfirmCommand($repository, $issueNumber, $issue['body']);
-
-                case 'cancel':
-                    return $this->handleCancelCommand($repository, $issueNumber);
-
-                case 'rollback':
-                    return $this->handleRollbackCommand($repository, $issueNumber);
-
-                case 'status':
-                    return $this->handleStatusCommand($repository, $issueNumber);
-
-                default:
-                    return response()->json(['message' => 'Unknown command'], 200);
-            }
-
-        } catch (Exception $e) {
-            Log::error('Failed to handle command', [
+        // Handle bot commands first
+        if ($command) {
+            Log::info('Bot command received', [
                 'command' => $command,
                 'repository' => $repository,
                 'issue_number' => $issueNumber,
-                'error' => $e->getMessage(),
             ]);
 
-            return response()->json([
-                'error' => 'Failed to execute command',
-                'message' => $e->getMessage(),
-            ], 400);
+            try {
+                switch ($command) {
+                    case 'confirm':
+                        return $this->handleConfirmCommand($repository, $issueNumber, $issue['body']);
+
+                    case 'cancel':
+                        return $this->handleCancelCommand($repository, $issueNumber);
+
+                    case 'rollback':
+                        return $this->handleRollbackCommand($repository, $issueNumber);
+
+                    case 'status':
+                        return $this->handleStatusCommand($repository, $issueNumber);
+
+                    default:
+                        return response()->json(['message' => 'Unknown command'], 200);
+                }
+
+            } catch (Exception $e) {
+                Log::error('Failed to handle command', [
+                    'command' => $command,
+                    'repository' => $repository,
+                    'issue_number' => $issueNumber,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return response()->json([
+                    'error' => 'Failed to execute command',
+                    'message' => $e->getMessage(),
+                ], 400);
+            }
         }
+
+        // Check if comment contains trigger command for spawning issues
+        if ($this->parser->hasTriggerCommand($commentBody)) {
+            Log::info('Spawn command found in comment', [
+                'repository' => $repository,
+                'issue_number' => $issueNumber,
+                'comment_body' => $commentBody,
+            ]);
+
+            try {
+                // Parse configuration from comment
+                $configuration = $this->parser->parse($commentBody);
+
+                // Dispatch job
+                ProcessSpawnIssueJob::dispatch($repository, $issueNumber, $configuration);
+
+                Log::info('Spawn issue job dispatched from comment', [
+                    'repository' => $repository,
+                    'issue_number' => $issueNumber,
+                ]);
+
+                return response()->json([
+                    'message' => 'Job dispatched successfully from comment',
+                    'repository' => $repository,
+                    'issue' => $issueNumber,
+                ], 200);
+
+            } catch (Exception $e) {
+                Log::error('Failed to parse configuration from comment or dispatch job', [
+                    'repository' => $repository,
+                    'issue_number' => $issueNumber,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return response()->json([
+                    'error' => 'Failed to process comment',
+                    'message' => $e->getMessage(),
+                ], 400);
+            }
+        }
+
+        // No bot command found
+        Log::info('No bot command found in comment', [
+            'repository' => $repository,
+            'issue_number' => $issueNumber,
+            'comment_body' => $commentBody,
+        ]);
+        return response()->json(['message' => 'No bot command found'], 200);
     }
 
     /**
@@ -233,16 +280,31 @@ class IssueWebhookController extends Controller
      */
     private function handleRollbackCommand(string $repository, int $issueNumber): JsonResponse
     {
-        // Find last completed run for this issue
+        // Find last run for this issue (completed, failed, or running)
+        Log::info('Looking for run to rollback', [
+            'repository' => $repository,
+            'issue_number' => $issueNumber,
+        ]);
+
         $lastRun = BotRun::where('repository', $repository)
             ->where('trigger_issue_number', $issueNumber)
-            ->whereIn('status', ['completed', 'failed'])
+            ->whereIn('status', ['completed', 'failed', 'running'])
             ->latest()
             ->first();
 
         if (!$lastRun) {
-            throw new Exception('No completed run found to rollback');
+            Log::error('No run found to rollback', [
+                'repository' => $repository,
+                'issue_number' => $issueNumber,
+            ]);
+            throw new Exception('No run found to rollback');
         }
+
+        Log::info('Found run to rollback', [
+            'run_id' => $lastRun->run_id,
+            'status' => $lastRun->status,
+            'created_at' => $lastRun->created_at,
+        ]);
 
         // Dispatch rollback job
         RollbackRunJob::dispatch($lastRun->run_id, $repository, $issueNumber);

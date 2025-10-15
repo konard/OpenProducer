@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Exception;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class ConfigurationParser
@@ -12,6 +13,11 @@ class ConfigurationParser
      */
     public function parse(string $issueBody): array
     {
+        Log::info('ConfigurationParser::parse called', [
+            'issue_body_length' => strlen($issueBody),
+            'issue_body_preview' => substr($issueBody, 0, 200),
+        ]);
+
         // Check if body contains the trigger command
         if (!$this->hasTriggerCommand($issueBody)) {
             throw new Exception('Issue body does not contain bot mention trigger');
@@ -38,7 +44,7 @@ class ConfigurationParser
             $line = trim($line);
 
             // Skip trigger mentions
-            if (Str::startsWith($line, '@xierongchuan') || Str::startsWith($line, '/spawn-issues')) {
+            if (Str::startsWith($line, '@TheOpenProducerBot') || Str::startsWith($line, '/spawn-issues')) {
                 continue;
             }
 
@@ -70,7 +76,33 @@ class ConfigurationParser
             if (Str::contains($line, ':')) {
                 [$key, $value] = array_map('trim', explode(':', $line, 2));
                 $key = strtolower($key);
+
+                Log::info('Found potential config line', [
+                    'line' => $line,
+                    'key' => $key,
+                    'value' => $value,
+                    'before_foundExplicitConfig' => $foundExplicitConfig,
+                ]);
+
+                // Only treat as config if it has both key and value, or if key is a known config key
+                $knownConfigKeys = ['count', 'labels', 'assignees', 'rate_limit_per_minute', 'dry_run', 'unique_by', 'components_list', 'template'];
+
+                if (empty($value) && !in_array($key, $knownConfigKeys)) {
+                    Log::info('Skipping line - empty value and not a known config key', [
+                        'line' => $line,
+                        'key' => $key,
+                    ]);
+                    // Don't treat as explicit config - it's probably just a sentence ending with colon
+                    $templateLines[] = $line;
+                    continue;
+                }
+
                 $foundExplicitConfig = true;
+
+                Log::info('Set foundExplicitConfig to true', [
+                    'line' => $line,
+                    'key' => $key,
+                ]);
 
                 switch ($key) {
                     case 'count':
@@ -111,9 +143,27 @@ class ConfigurationParser
             $config['template'] = implode("\n", $templateLines);
         }
 
+        Log::info('About to extract template', [
+            'foundExplicitConfig' => $foundExplicitConfig,
+            'current_template' => $config['template'],
+            'template_length' => strlen($config['template']),
+        ]);
+
         // If no explicit config was found, treat entire issue body as template
         if (!$foundExplicitConfig) {
+            Log::info('Extracting template from comment body');
             $config['template'] = $this->extractTemplateFromBody($issueBody);
+
+            // Debug logging
+            Log::info('Template extracted from comment', [
+                'template' => $config['template'],
+                'template_length' => strlen($config['template']),
+                'template_empty' => empty($config['template']),
+            ]);
+        } else {
+            Log::info('Using explicit config template, skipping extraction', [
+                'template' => $config['template'],
+            ]);
         }
 
         return $this->validateConfiguration($config);
@@ -139,16 +189,43 @@ class ConfigurationParser
         $lines = explode("\n", $issueBody);
         $templateLines = [];
 
-        foreach ($lines as $line) {
+        Log::info('extractTemplateFromBody processing', [
+            'total_lines' => count($lines),
+            'lines' => $lines,
+        ]);
+
+        foreach ($lines as $index => $line) {
+            $originalLine = $line;
             $line = trim($line);
+
+            Log::info('Processing line', [
+                'index' => $index,
+                'original' => $originalLine,
+                'trimmed' => $line,
+                'is_mention' => Str::startsWith($line, '@TheOpenProducerBot'),
+                'is_command' => Str::startsWith($line, '/spawn-issues'),
+            ]);
+
             // Skip mention triggers
-            if (Str::startsWith($line, '@xierongchuan') || Str::startsWith($line, '/spawn-issues')) {
+            if (Str::startsWith($line, '@TheOpenProducerBot') || Str::startsWith($line, '/spawn-issues')) {
+                Log::info('Skipping trigger line', ['line' => $line]);
                 continue;
             }
+
+            Log::info('Adding to template', ['line' => $line]);
             $templateLines[] = $line;
         }
 
-        return trim(implode("\n", $templateLines));
+        $template = trim(implode("\n", $templateLines));
+
+        Log::info('Template extraction result', [
+            'template_lines_count' => count($templateLines),
+            'template' => $template,
+            'template_length' => strlen($template),
+            'is_empty' => empty($template),
+        ]);
+
+        return $template;
     }
 
     /**
@@ -190,6 +267,12 @@ class ConfigurationParser
      */
     private function validateConfiguration(array $config): array
     {
+        Log::info('validateConfiguration called', [
+            'config' => $config,
+            'template_length' => strlen($config['template'] ?? ''),
+            'template_empty' => empty($config['template'] ?? ''),
+        ]);
+
         $maxIssues = config('bot.behavior.max_issues_per_run');
 
         // Count is now optional - if null, will be determined by AI
@@ -202,6 +285,11 @@ class ConfigurationParser
         }
 
         if (empty($config['template'])) {
+            Log::error('Template validation failed', [
+                'template' => $config['template'],
+                'template_length' => strlen($config['template'] ?? ''),
+                'is_empty' => empty($config['template'] ?? ''),
+            ]);
             throw new Exception('Template is required - please provide a description or specification');
         }
 
@@ -220,15 +308,20 @@ class ConfigurationParser
         $commentBody = trim($commentBody);
 
         $commands = [
-            'confirm' => config('bot.commands.confirm', '@bot confirm'),
-            'cancel' => config('bot.commands.cancel', '@bot cancel'),
-            'rollback' => config('bot.commands.rollback', '@bot rollback last'),
-            'status' => config('bot.commands.status', '@bot status'),
+            'confirm' => config('bot.commands.confirm', '@TheOpenProducerBot confirm'),
+            'cancel' => config('bot.commands.cancel', '@TheOpenProducerBot cancel'),
+            'rollback' => config('bot.commands.rollback', '@TheOpenProducerBot rollback last'),
+            'status' => config('bot.commands.status', '@TheOpenProducerBot status'),
         ];
 
         foreach ($commands as $name => $pattern) {
-            if (Str::startsWith($commentBody, $pattern)) {
-                return $name;
+            // Support both string patterns and arrays of patterns
+            $patterns = is_array($pattern) ? $pattern : [$pattern];
+
+            foreach ($patterns as $p) {
+                if (Str::startsWith($commentBody, $p)) {
+                    return $name;
+                }
             }
         }
 

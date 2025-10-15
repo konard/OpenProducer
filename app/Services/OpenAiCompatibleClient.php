@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services;
 
 use Exception;
@@ -22,10 +24,10 @@ class OpenAiCompatibleClient implements AiClientInterface
         $this->baseUrl = rtrim(config('bot.openai.base_url'), '/');
         $this->apiKey = config('bot.openai.api_key');
         $this->model = config('bot.openai.model');
-        $this->temperature = config('bot.openai.temperature');
-        $this->maxTokens = config('bot.openai.max_tokens');
-        $this->timeout = config('bot.openai.timeout');
-        $this->cacheTtl = config('bot.openai.cache_ttl');
+        $this->temperature = (float) config('bot.openai.temperature');
+        $this->maxTokens = (int) config('bot.openai.max_tokens');
+        $this->timeout = (int) config('bot.openai.timeout');
+        $this->cacheTtl = (int) config('bot.openai.cache_ttl');
     }
 
     /**
@@ -35,7 +37,10 @@ class OpenAiCompatibleClient implements AiClientInterface
     {
         if (!$this->isAvailable()) {
             Log::warning('AI service is not available, using default count');
-            return $this->estimateCountFromRequirements($requirements);
+            return min(
+                config('bot.behavior.max_issues_per_run', 100),
+                $this->estimateCountFromRequirements($requirements)
+            );
         }
 
         try {

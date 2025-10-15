@@ -10,6 +10,7 @@ use App\Services\ContentFilter;
 use App\Services\DeduplicationService;
 use App\Services\GithubClient;
 use App\Services\OpenAiCompatibleClient;
+use App\Services\GeminiClient;
 use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -152,7 +153,7 @@ class ProcessSpawnIssueJob implements ShouldQueue
             'configuration' => $this->configuration,
             'dry_run' => $this->configuration['dry_run'],
             'confirmed' => $this->isConfirmed,
-            'issues_planned' => $this->configuration['count'],
+            'issues_planned' => $this->configuration['count'] ?? 0,  // Default to 0 if not specified
         ]);
     }
 

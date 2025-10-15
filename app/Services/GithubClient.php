@@ -17,14 +17,108 @@ class GithubClient
 
     public function __construct()
     {
-        $this->token = config('bot.github.token');
         $this->apiVersion = config('bot.github.api_version');
         $this->retryAttempts = config('bot.behavior.retry_attempts', 3);
         $this->retryBackoffBase = config('bot.behavior.retry_backoff_base', 2);
 
+        $mode = config('bot.github.mode', 'token');
+
+        if ($mode === 'app') {
+            // GitHub App mode
+            $this->token = $this->generateAppToken();
+            Log::info('Using GitHub App authentication');
+        } else {
+            // Personal Access Token mode
+            $this->token = config('bot.github.token');
+            Log::info('Using Personal Access Token authentication');
+        }
+
         if (empty($this->token)) {
             throw new Exception('GitHub token is not configured');
         }
+    }
+
+    /**
+     * Generate access token for GitHub App authentication
+     */
+    private function generateAppToken(): string
+    {
+        $appId = config('bot.github.app_id');
+        $privateKeyPath = config('bot.github.private_key_path');
+
+        if (empty($appId) || empty($privateKeyPath)) {
+            throw new Exception('GitHub App ID or private key path is not configured');
+        }
+
+        if (!file_exists($privateKeyPath)) {
+            throw new Exception("GitHub App private key file not found: {$privateKeyPath}");
+        }
+
+        $privateKey = file_get_contents($privateKeyPath);
+        if ($privateKey === false) {
+            throw new Exception("Failed to read GitHub App private key file: {$privateKeyPath}");
+        }
+
+        // Create JWT token
+        $payload = [
+            'iat' => time(),
+            'exp' => time() + 600, // 10 minutes expiration
+            'iss' => $appId,
+        ];
+
+        $jwt = \Firebase\JWT\JWT::encode($payload, $privateKey, 'RS256');
+
+        // Get installation access token
+        $accessToken = $this->getInstallationAccessToken($jwt);
+
+        Log::info('Generated GitHub App access token', [
+            'app_id' => $appId,
+            'expires_in' => 3600, // Installation access tokens last 1 hour
+        ]);
+
+        return $accessToken;
+    }
+
+    /**
+     * Get installation access token using JWT
+     */
+    private function getInstallationAccessToken(string $jwt): string
+    {
+        // First, get installations for this app
+        $response = Http::withHeaders([
+            'Authorization' => "Bearer {$jwt}",
+            'Accept' => 'application/vnd.github.v3+json',
+        ])->get('https://api.github.com/app/installations');
+
+        if (!$response->successful()) {
+            throw new Exception('Failed to get GitHub App installations: ' . $response->body());
+        }
+
+        $installations = $response->json();
+        if (empty($installations)) {
+            throw new Exception('No GitHub App installations found. Please install the app on a repository.');
+        }
+
+        // Use the first installation (in a real app, you might want to match by repository)
+        $installationId = $installations[0]['id'];
+
+        Log::info('Found GitHub App installation', [
+            'installation_id' => $installationId,
+            'account' => $installations[0]['account']['login'],
+        ]);
+
+        // Generate access token for the installation
+        $tokenResponse = Http::withHeaders([
+            'Authorization' => "Bearer {$jwt}",
+            'Accept' => 'application/vnd.github.v3+json',
+        ])->post("https://api.github.com/app/installations/{$installationId}/access_tokens");
+
+        if (!$tokenResponse->successful()) {
+            throw new Exception('Failed to generate installation access token: ' . $tokenResponse->body());
+        }
+
+        $tokenData = $tokenResponse->json();
+        return $tokenData['token'];
     }
 
     /**

@@ -28,7 +28,7 @@ return [
     |--------------------------------------------------------------------------
     |
     | Configuration for OpenAI-compatible API integration. Supports multiple
-    | providers including ZAI GLM 4.6, OpenAI, and custom implementations.
+    | providers including ZAI GLM 4.6, OpenAI, Gemini, and custom implementations.
     |
     */
 
@@ -41,6 +41,25 @@ return [
         'max_tokens' => env('OPENAI_MAX_TOKENS', 2000),
         'timeout' => 60, // seconds
         'cache_ttl' => 3600, // 1 hour cache for LLM responses
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Gemini API Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Configuration for Google Gemini API integration using native format.
+    |
+    */
+
+    'gemini' => [
+        'base_url' => env('GEMINI_API_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta'),
+        'api_key' => env('GEMINI_API_KEY'),
+        'model' => env('GEMINI_MODEL', 'gemini-2.5-flash'),
+        'temperature' => env('GEMINI_TEMPERATURE', 0.3),
+        'max_tokens' => env('GEMINI_MAX_TOKENS', 32000),
+        'timeout' => env('GEMINI_TIMEOUT', 60),
+        'cache_ttl' => env('GEMINI_CACHE_TTL', 3600),
     ],
 
     /*
@@ -97,12 +116,12 @@ return [
     */
 
     'commands' => [
-        'mention_trigger' => '@xierongchuan', // New mention-based trigger
+        'mention_trigger' => '@TheOpenProducerBot', // New mention-based trigger
         'trigger' => '/spawn-issues', // Legacy command (kept for backwards compatibility)
-        'confirm' => '@bot confirm',
-        'cancel' => '@bot cancel',
-        'rollback' => '@bot rollback last',
-        'status' => '@bot status',
+        'confirm' => '@TheOpenProducerBot confirm',
+        'cancel' => '@TheOpenProducerBot cancel',
+        'rollback' => '@TheOpenProducerBot rollback last',
+        'status' => '@TheOpenProducerBot status',
     ],
 
     /*
