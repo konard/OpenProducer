@@ -95,7 +95,8 @@ return [
     */
 
     'commands' => [
-        'trigger' => '/spawn-issues',
+        'mention_trigger' => '@xierongchuan', // New mention-based trigger
+        'trigger' => '/spawn-issues', // Legacy command (kept for backwards compatibility)
         'confirm' => '@bot confirm',
         'cancel' => '@bot cancel',
         'rollback' => '@bot rollback last',
