@@ -2,7 +2,14 @@
     "name": "xierongchuan/openproducer",
     "type": "project",
     "description": "OpenProducer bot for creating multiple issues with OpenAI-compatible API support",
-    "keywords": ["laravel", "github", "bot", "openai", "zai", "glm"],
+    "keywords": [
+        "laravel",
+        "github",
+        "bot",
+        "openai",
+        "zai",
+        "glm"
+    ],
     "license": "MIT",
     "require": {
         "php": "^8.2",
@@ -20,7 +27,9 @@
         "pestphp/pest": "^4.1",
         "pestphp/pest-plugin-laravel": "^4.0",
         "phpunit/phpunit": "^10.0",
-        "spatie/laravel-ignition": "^2.0"
+        "spatie/laravel-ignition": "^2.0",
+        "friendsofphp/php-cs-fixer": "^3.85",
+        "squizlabs/php_codesniffer": "^3.13"
     },
     "autoload": {
         "psr-4": {
