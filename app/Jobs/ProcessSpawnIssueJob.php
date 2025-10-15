@@ -163,6 +163,10 @@ class ProcessSpawnIssueJob implements ShouldQueue
             ? "\n\n⚠️ **Warnings**:\n" . implode("\n", array_map(fn($w) => "- {$w}", $warnings))
             : '';
 
+        $labelsText = !empty($this->configuration['labels'])
+            ? implode(', ', $this->configuration['labels'])
+            : '';
+
         $comment = <<<COMMENT
 🤖 **Dry Run / Confirmation Required**
 
@@ -174,7 +178,7 @@ class ProcessSpawnIssueJob implements ShouldQueue
 ```
 {$this->configuration['template']}
 ```
-- Labels: `" . implode(', ', $this->configuration['labels']) . "`
+- Labels: `{$labelsText}`
 - Unique by: `{$this->configuration['unique_by']}`
 {$warningsText}
 
@@ -289,6 +293,7 @@ COMMENT;
             $createdIssues
         );
 
+        $issueLinksText = implode("\n", $issueLinks);
         $summary = $botRun->getSummary();
 
         $comment = <<<COMMENT
@@ -300,7 +305,7 @@ COMMENT;
 **Duration**: {$summary['duration']}
 
 **Created issues**:
-" . implode("\n", $issueLinks) . "
+{$issueLinksText}
 
 To rollback this run, reply with: `@bot rollback last`
 COMMENT;
