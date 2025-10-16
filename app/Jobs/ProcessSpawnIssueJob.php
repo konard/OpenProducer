@@ -196,8 +196,8 @@ class ProcessSpawnIssueJob implements ShouldQueue
 
 **Preview**: This will create issues based on the template above.
 
-To proceed, reply with: `@bot confirm`
-To cancel, reply with: `@bot cancel`
+To proceed, comment with: `@TheOpenProducerBot confirm`
+To cancel, comment with: `@TheOpenProducerBot cancel`
 COMMENT;
 
         $github->createComment($owner, $repo, $this->triggerIssueNumber, $comment);
@@ -319,7 +319,7 @@ COMMENT;
 **Created issues**:
 {$issueLinksText}
 
-To rollback this run, reply with: `@bot rollback last`
+To rollback this run, comment with: `@TheOpenProducerBot rollback last`
 COMMENT;
 
         $github->createComment($owner, $repo, $this->triggerIssueNumber, $comment);

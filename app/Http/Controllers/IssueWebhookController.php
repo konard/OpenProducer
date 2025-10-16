@@ -231,22 +231,42 @@ class IssueWebhookController extends Controller
      */
     private function handleConfirmCommand(string $repository, int $issueNumber, string $issueBody): JsonResponse
     {
-        // Parse configuration again
-        $configuration = $this->parser->parse($issueBody);
-
         // Find pending run for this issue
         $pendingRun = BotRun::where('repository', $repository)
             ->where('trigger_issue_number', $issueNumber)
             ->where('status', 'pending')
+            ->where('dry_run', true)
             ->latest()
             ->first();
 
-        if ($pendingRun) {
-            // Mark as confirmed
-            $pendingRun->update(['confirmed' => true]);
+        if (!$pendingRun) {
+            Log::warning('No pending run found for confirmation', [
+                'repository' => $repository,
+                'issue_number' => $issueNumber,
+            ]);
+            throw new Exception('No pending run found to confirm. Please start a new request.');
         }
 
-        // Dispatch with confirmation
+        // Get configuration from the pending run instead of re-parsing
+        $configuration = $pendingRun->configuration;
+
+        // Override dry_run to false when confirmed
+        $configuration['dry_run'] = false;
+
+        // Mark the pending run as confirmed and cancelled (it will be replaced by a new run)
+        $pendingRun->update([
+            'confirmed' => true,
+            'status' => 'cancelled',
+        ]);
+
+        Log::info('Confirmation received, dispatching job', [
+            'repository' => $repository,
+            'issue_number' => $issueNumber,
+            'run_id' => $pendingRun->run_id,
+            'dry_run_override' => false,
+        ]);
+
+        // Dispatch with confirmation and dry_run overridden to false
         ProcessSpawnIssueJob::dispatch($repository, $issueNumber, $configuration, true);
 
         return response()->json(['message' => 'Confirmation received, processing'], 200);
